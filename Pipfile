@@ -6,8 +6,13 @@ name = "pypi"
 [packages]
 beautifulsoup4 = "*"
 pypdf2 = "*"
+requests = "*"
 
 [dev-packages]
+black = "*"
 
 [requires]
 python_version = "3.10"
+
+[pipenv]
+allow_prereleases = true
