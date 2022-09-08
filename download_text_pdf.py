@@ -1,15 +1,16 @@
-from dataclasses import dataclass
-import dataclasses
-from numbers import Number
-import os
-from typing import Awaitable
-from PyPDF2 import PdfMerger, PdfReader
 import asyncio
+import dataclasses
+import os
+from dataclasses import dataclass
+from functools import partial
+from typing import Awaitable
+
 import aiofiles
 import aiohttp
-from functools import partial
+from PyPDF2 import PdfMerger, PdfReader
 
-from get_pdf_links import EpisodePdfLink, PodcastMetaData, Topic, get_episode_links
+from get_pdf_links import (EpisodePdfLink, PodcastMetaData, Topic,
+                           get_episode_links)
 
 DOWNLOAD_FOLDER = "downloads"
 

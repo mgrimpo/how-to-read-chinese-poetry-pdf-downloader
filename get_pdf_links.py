@@ -1,10 +1,10 @@
+import re
 from dataclasses import dataclass
 from functools import reduce
-import re
-from typing import Tuple
+
 import aiohttp
-from dataclasses import dataclass
-from bs4 import BeautifulSoup, Tag, PageElement
+from bs4 import BeautifulSoup, PageElement, Tag
+
 from errors import UnexpectedPatternException
 
 HTRCP_PODCAST_PAGE_URL = "https://howtoreadchinesepoetry.com/"
