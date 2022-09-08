@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import dataclasses
 from numbers import Number
 import os
+from typing import Awaitable
 from PyPDF2 import PdfMerger, PdfReader
 import asyncio
 import aiofiles
@@ -13,13 +14,15 @@ from get_pdf_links import EpisodeLink, get_episode_links
 DOWNLOAD_FOLDER = "downloads"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EpisodePdf:
     episode_number: int
     title: str
     path: str
-    num_pages: int | None  # None represents 'number of pages unknown'
 
+@dataclass(kw_only=True)
+class EpisodePdfWithNumPages(EpisodePdf):
+    num_pages: int
 
 async def main():
     os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -34,7 +37,7 @@ async def main():
         merge_pdfs(await asyncio.gather(*episode_pdfs))
 
 
-def merge_pdfs(episode_pdfs: list[EpisodePdf]):
+def merge_pdfs(episode_pdfs: list[EpisodePdfWithNumPages]):
     pdfMerger = PdfMerger()
     current_page = 0  # starts with 0, starting with 1 yields off by one errors
     for episode_pdf in episode_pdfs:
@@ -46,11 +49,11 @@ def merge_pdfs(episode_pdfs: list[EpisodePdf]):
     pdfMerger.write("merged.pdf")
 
 
-async def add_num_pages(episode_pdf: EpisodePdf) -> list[EpisodePdf]:
-    episode_pdf = await episode_pdf
+async def add_num_pages(episode_pdf_awaitable: Awaitable[EpisodePdf]) -> EpisodePdfWithNumPages:
+    episode_pdf = await episode_pdf_awaitable
     pdfReader = PdfReader(episode_pdf.path)
     num_pages = len(pdfReader.pages)
-    return dataclasses.replace(episode_pdf, num_pages=num_pages)
+    return EpisodePdfWithNumPages(num_pages=num_pages, **dataclasses.asdict(episode_pdf))
 
 
 async def download_episode_pdf(
@@ -61,7 +64,6 @@ async def download_episode_pdf(
         episode_number=episode_link.episode_number,
         title=episode_link.title,
         path=_download_pdf_path(episode_link.episode_number),
-        num_pages=None,  # unknown as of yet
     )
     if os.path.exists(episode_pdf.path):
         async with session.head(episode_link.url) as response:
@@ -83,7 +85,7 @@ def _log_skip(episode_link, response_size):
     )
 
 
-def _download_pdf_path(episode_number: Number):
+def _download_pdf_path(episode_number: int):
     return f"{DOWNLOAD_FOLDER}{os.sep}{episode_number}.pdf"
 
 
