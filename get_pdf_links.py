@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from doctest import UnexpectedException
+from functools import reduce
 import re
 import aiohttp
 from dataclasses import dataclass
@@ -36,12 +37,17 @@ async def get_episode_links(session: aiohttp.ClientSession):
         return episode_links
 
 def episode_title(episode_label: Tag):
-    match episode_label.next_sibling:
-        case str(title): 
-            if title[-1] == '[': title = title[0:-1]
-            title = title.replace('\xa0', ' ')
-            return title.strip()
-        case unexpected: raise errors.UnexpectedPatternException(unexpected)
+    def _tag_text_join(first_tag, second_tag):
+        match [first_tag, second_tag]:
+            case [str(first_text), str(second_text)]: return first_text + second_text
+            case [Tag(text=first_text), str(second_text)]: return first_text + second_text
+            case [str(first_text), Tag(text=second_text)]: return first_text + second_text
+            case [Tag(text=first_text), Tag(text=second_text)]: return first_text + second_text
+    siblings = filter( lambda tag: tag.name != 'a', episode_label.next_siblings)
+    title = reduce(_tag_text_join, siblings)
+    title = title.replace('[]', '')
+    title = title.replace('\xa0', ' ')
+    return title.strip()
 
 def episode_pdf_url(episode_label):
     match find_link_in_siblings(episode_label):
