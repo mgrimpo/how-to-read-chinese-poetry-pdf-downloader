@@ -9,55 +9,92 @@ import aiofiles
 import aiohttp
 from functools import partial
 
-from get_pdf_links import EpisodeLink, get_episode_links
+from get_pdf_links import EpisodePdfLink, PodcastMetaData, Topic, get_episode_links
 
 DOWNLOAD_FOLDER = "downloads"
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class EpisodePdf:
     episode_number: int
     title: str
     path: str
 
-@dataclass(kw_only=True)
+
+@dataclass(kw_only=True, frozen=True)
 class EpisodePdfWithNumPages(EpisodePdf):
     num_pages: int
+
+
+@dataclass(kw_only=True)
+class TopicWithEpisodes(Topic):
+    episodes: list[EpisodePdfWithNumPages]
+
 
 async def main():
     os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
     async with aiohttp.ClientSession() as session:
-        episode_links = await get_episode_links(session)
+        podcast_meta_data = await get_episode_links(session)
 
         episode_pdfs_without_page_meta_data = map(
-            partial(download_episode_pdf, session=session), episode_links
+            partial(download_episode_pdf, session=session), podcast_meta_data.episodes
         )
 
-        episode_pdfs = map(add_num_pages, episode_pdfs_without_page_meta_data)
-        merge_pdfs(await asyncio.gather(*episode_pdfs))
+        episode_pdf_awaitables = map(add_num_pages, episode_pdfs_without_page_meta_data)
+        episode_pdfs: list[EpisodePdfWithNumPages] = await asyncio.gather(
+            *episode_pdf_awaitables
+        )
+
+        remaining_episodes = set(episode_pdfs)
+        topics: list[TopicWithEpisodes] = []
+        for topic in podcast_meta_data.topics:
+            if topic.last_episode is not -1:
+                topic_episodes = set(
+                    filter(
+                        lambda episode: topic.first_episode <= episode.episode_number
+                        and episode.episode_number <= topic.last_episode,
+                        remaining_episodes,
+                    )
+                )
+                remaining_episodes = remaining_episodes - topic_episodes
+            else:
+                topic_episodes = [*remaining_episodes]
+            topics.append(
+                TopicWithEpisodes(
+                    episodes=list(topic_episodes), **dataclasses.asdict(topic)
+                )
+            )
+
+        merge_pdfs(topics)
 
 
-def merge_pdfs(episode_pdfs: list[EpisodePdfWithNumPages]):
+def merge_pdfs(topics: list[TopicWithEpisodes]):
     pdfMerger = PdfMerger()
     current_page = 0  # starts with 0, starting with 1 yields off by one errors
-    for episode_pdf in episode_pdfs:
-        pdfMerger.append(episode_pdf.path)
-        pdfMerger.add_outline_item(
-            pagenum=current_page, title=f"Episode {episode_pdf.episode_number} – {episode_pdf.title}"
-        )
-        current_page += episode_pdf.num_pages
-    pdfMerger.write("merged.pdf")
+    for topic in topics:
+        for episode_pdf in topic.episodes:
+            pdfMerger.append(episode_pdf.path)
+            pdfMerger.add_outline_item(
+                pagenum=current_page,
+                title=f"Episode {episode_pdf.episode_number} – {episode_pdf.title}",
+            )
+            current_page += episode_pdf.num_pages
+        pdfMerger.write("merged.pdf")
 
 
-async def add_num_pages(episode_pdf_awaitable: Awaitable[EpisodePdf]) -> EpisodePdfWithNumPages:
+async def add_num_pages(
+    episode_pdf_awaitable: Awaitable[EpisodePdf],
+) -> EpisodePdfWithNumPages:
     episode_pdf = await episode_pdf_awaitable
     pdfReader = PdfReader(episode_pdf.path)
     num_pages = len(pdfReader.pages)
-    return EpisodePdfWithNumPages(num_pages=num_pages, **dataclasses.asdict(episode_pdf))
+    return EpisodePdfWithNumPages(
+        num_pages=num_pages, **dataclasses.asdict(episode_pdf)
+    )
 
 
 async def download_episode_pdf(
-    episode_link: EpisodeLink, session: aiohttp.ClientSession
+    episode_link: EpisodePdfLink, session: aiohttp.ClientSession
 ) -> EpisodePdf:
     """Download pdfs for the given links, writes them to disk and returns EpisodePdf metatdata"""
     episode_pdf = EpisodePdf(
