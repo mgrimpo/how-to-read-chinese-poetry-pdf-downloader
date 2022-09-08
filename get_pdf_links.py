@@ -36,10 +36,10 @@ def get_episode_links():
 def find_link_in_siblings(elem: Tag) -> Tag:
     anchor_element = elem.find_next_sibling("a")
     match anchor_element:
-        case None:
-            return None
         case Tag(attrs={"href": href, **rest}):
             return href
+        case None:
+            return None
         case _:
             raise Exception(anchor_element, " was unexpected")
 
@@ -48,11 +48,9 @@ def content_starts_with_episode(elem: Tag) -> bool:
     """Check for elements with string content starting with 'Episode'"""
 
     match elem:
-        case None:
-            return False
         case Tag(contents=contents):
             if not isinstance(contents[0], str):
                 return False
             return contents[0].strip().startswith("Episode")
-        case unexpected_value:
-            raise Exception("Didn't expect: ", unexpected_value)
+        case None:
+            return False
