@@ -30,7 +30,7 @@ class PodcastMetaData:
     episodes: list[EpisodePdfLink]
 
 
-async def get_episode_links(session: aiohttp.ClientSession) -> PodcastMetaData:
+async def get_podcast_meta_data(session: aiohttp.ClientSession) -> PodcastMetaData:
     async with session.get(HTRCP_PODCAST_PAGE_URL) as response:
         podcast_page_html = await response.text()
         soup = BeautifulSoup(podcast_page_html, "html.parser")

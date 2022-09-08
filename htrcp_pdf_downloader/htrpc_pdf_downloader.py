@@ -9,8 +9,7 @@ import aiofiles
 import aiohttp
 from PyPDF2 import PdfMerger, PdfReader
 
-from get_pdf_links import (EpisodePdfLink, PodcastMetaData, Topic,
-                           get_episode_links)
+from parse_podcast_webpage import EpisodePdfLink, Topic, get_podcast_meta_data
 
 DOWNLOAD_FOLDER = "downloads"
 
@@ -35,7 +34,7 @@ class TopicWithEpisodes(Topic):
 async def main():
     os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
     async with aiohttp.ClientSession() as session:
-        podcast_meta_data = await get_episode_links(session)
+        podcast_meta_data = await get_podcast_meta_data(session)
 
         episode_pdfs_without_page_meta_data = map(
             partial(download_episode_pdf, session=session), podcast_meta_data.episodes
@@ -49,7 +48,9 @@ async def main():
         merge_pdfs(_merge_topics_and_episodes(podcast_meta_data.topics, episode_pdfs))
 
 
-def _merge_topics_and_episodes(topics: list[Topic], episode_pdfs: list[EpisodePdfWithNumPages]):
+def _merge_topics_and_episodes(
+    topics: list[Topic], episode_pdfs: list[EpisodePdfWithNumPages]
+):
     remaining_episodes = set(episode_pdfs)
     result: list[TopicWithEpisodes] = []
     for topic in topics:
@@ -66,7 +67,8 @@ def _merge_topics_and_episodes(topics: list[Topic], episode_pdfs: list[EpisodePd
             topic_episodes = remaining_episodes
         result.append(
             TopicWithEpisodes(
-                episodes=sorted(topic_episodes, key=lambda e: e.episode_number), **dataclasses.asdict(topic)
+                episodes=sorted(topic_episodes, key=lambda e: e.episode_number),
+                **dataclasses.asdict(topic),
             )
         )
     return result
@@ -80,14 +82,14 @@ def merge_pdfs(topics: list[TopicWithEpisodes]):
         title = topic.title.replace(":", " –")
         topic_outline_item = pdfMerger.add_outline_item(
             pagenum=current_page,
-            title=f'{topic.first_episode}-{last_episdoe}: {title}',
+            title=f"{topic.first_episode}-{last_episdoe}: {title}",
         )
         for episode_pdf in topic.episodes:
             pdfMerger.append(episode_pdf.path)
             pdfMerger.add_outline_item(
                 pagenum=current_page,
                 title=f"Episode {episode_pdf.episode_number} – {episode_pdf.title}",
-                parent=topic_outline_item
+                parent=topic_outline_item,
             )
             current_page += episode_pdf.num_pages
     pdfMerger.write("merged.pdf")
