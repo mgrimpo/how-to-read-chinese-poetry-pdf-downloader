@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+from doctest import UnexpectedException
 import re
 import aiohttp
 from dataclasses import dataclass
 from bs4 import BeautifulSoup, Tag
+import errors
 
 HTRCP_PODCAST_PAGE_URL = "https://howtoreadchinesepoetry.com/"
 
@@ -11,6 +13,7 @@ HTRCP_PODCAST_PAGE_URL = "https://howtoreadchinesepoetry.com/"
 class EpisodeLink:
     url: str
     episode_number: int
+    title: str | None
 
 
 async def get_episode_links(session: aiohttp.ClientSession):
@@ -22,16 +25,35 @@ async def get_episode_links(session: aiohttp.ClientSession):
         episode_links: list[EpisodeLink] = []
 
         for episode_label in episode_labels:
-            match find_link_in_siblings(episode_label):
-                case str(link):
-                    episode_number = re.search(
-                        "Episode (\d+)", episode_label.text.strip()
-                    ).group(1)
-                    episode_links.append(EpisodeLink(link, int(episode_number)))
-                case unknown:
-                    raise Exception("Unknown result ", unknown)
+            episode_links.append(
+                EpisodeLink(
+                    url=episode_pdf_url(episode_label),
+                    episode_number=episode_number(episode_label),
+                    title=episode_title(episode_label),
+                )
+            )
         print(*episode_links, sep="\n")
         return episode_links
+
+def episode_title(episode_label: Tag):
+    match episode_label.next_sibling:
+        case str(title): 
+            if title[-1] == '[': title = title[0:-1]
+            title = title.replace('\xa0', ' ')
+            return title.strip()
+        case unexpected: raise errors.UnexpectedPatternException(unexpected)
+
+def episode_pdf_url(episode_label):
+    match find_link_in_siblings(episode_label):
+        case str(url):
+            return url
+        case unexpected:
+            raise errors.UnexpectedPatternException(unexpected)
+
+
+def episode_number(episode_label):
+    result = re.search("Episode (\d+)", episode_label.text.strip()).group(1)
+    return int(result)
 
 
 def find_link_in_siblings(elem: Tag) -> Tag:
@@ -41,8 +63,8 @@ def find_link_in_siblings(elem: Tag) -> Tag:
             return href
         case None:
             return None
-        case _:
-            raise Exception(anchor_element, " was unexpected")
+        case unexpected:
+            raise errors.UnexpectedPatternException(unexpected)
 
 
 def content_starts_with_episode(elem: Tag) -> bool:

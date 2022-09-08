@@ -16,6 +16,7 @@ DOWNLOAD_FOLDER = "downloads"
 @dataclass
 class EpisodePdf:
     episode_number: int
+    title: str
     path: str
     num_pages: int | None  # None represents 'number of pages unknown'
 
@@ -35,11 +36,11 @@ async def main():
 
 def merge_pdfs(episode_pdfs: list[EpisodePdf]):
     pdfMerger = PdfMerger()
-    current_page = 0 # starts with 0, starting with 1 yields off by one errors
+    current_page = 0  # starts with 0, starting with 1 yields off by one errors
     for episode_pdf in episode_pdfs:
         pdfMerger.append(episode_pdf.path)
         pdfMerger.add_outline_item(
-            pagenum=current_page, title=f"Episode {episode_pdf.episode_number}"
+            pagenum=current_page, title=f"Episode {episode_pdf.episode_number} – {episode_pdf.title}"
         )
         current_page += episode_pdf.num_pages
     pdfMerger.write("merged.pdf")
@@ -58,6 +59,7 @@ async def download_episode_pdf(
     """Download pdfs for the given links, writes them to disk and returns EpisodePdf metatdata"""
     episode_pdf = EpisodePdf(
         episode_number=episode_link.episode_number,
+        title=episode_link.title,
         path=_download_pdf_path(episode_link.episode_number),
         num_pages=None,  # unknown as of yet
     )
