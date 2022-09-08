@@ -45,41 +45,51 @@ async def main():
             *episode_pdf_awaitables
         )
 
-        remaining_episodes = set(episode_pdfs)
-        topics: list[TopicWithEpisodes] = []
-        for topic in podcast_meta_data.topics:
-            if topic.last_episode is not -1:
-                topic_episodes = set(
-                    filter(
-                        lambda episode: topic.first_episode <= episode.episode_number
-                        and episode.episode_number <= topic.last_episode,
-                        remaining_episodes,
-                    )
-                )
-                remaining_episodes = remaining_episodes - topic_episodes
-            else:
-                topic_episodes = [*remaining_episodes]
-            topics.append(
-                TopicWithEpisodes(
-                    episodes=list(topic_episodes), **dataclasses.asdict(topic)
+        merge_pdfs(_merge_topics_and_episodes(podcast_meta_data.topics, episode_pdfs))
+
+
+def _merge_topics_and_episodes(topics: list[Topic], episode_pdfs: list[EpisodePdfWithNumPages]):
+    remaining_episodes = set(episode_pdfs)
+    result: list[TopicWithEpisodes] = []
+    for topic in topics:
+        if topic.last_episode != -1:
+            topic_episodes = set(
+                filter(
+                    lambda episode: topic.first_episode <= episode.episode_number
+                    and episode.episode_number <= topic.last_episode,
+                    remaining_episodes,
                 )
             )
-
-        merge_pdfs(topics)
+            remaining_episodes = remaining_episodes - topic_episodes
+        else:
+            topic_episodes = remaining_episodes
+        result.append(
+            TopicWithEpisodes(
+                episodes=sorted(topic_episodes, key=lambda e: e.episode_number), **dataclasses.asdict(topic)
+            )
+        )
+    return result
 
 
 def merge_pdfs(topics: list[TopicWithEpisodes]):
     pdfMerger = PdfMerger()
     current_page = 0  # starts with 0, starting with 1 yields off by one errors
     for topic in topics:
+        last_episdoe = topic.last_episode if topic.last_episode != -1 else " "
+        title = topic.title.replace(":", " –")
+        topic_outline_item = pdfMerger.add_outline_item(
+            pagenum=current_page,
+            title=f'{topic.first_episode}-{last_episdoe}: {title}',
+        )
         for episode_pdf in topic.episodes:
             pdfMerger.append(episode_pdf.path)
             pdfMerger.add_outline_item(
                 pagenum=current_page,
                 title=f"Episode {episode_pdf.episode_number} – {episode_pdf.title}",
+                parent=topic_outline_item
             )
             current_page += episode_pdf.num_pages
-        pdfMerger.write("merged.pdf")
+    pdfMerger.write("merged.pdf")
 
 
 async def add_num_pages(
