@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from doctest import UnexpectedException
 from functools import reduce
 import re
 from typing import cast
@@ -67,8 +66,10 @@ def _episode_pdf_url(episode_label) -> str:
 
 
 def _episode_number(episode_label) -> int:
-    result = re.search("Episode (\d+)", episode_label.text.strip()).group(1)
-    return int(result)
+    match_result = re.search("Episode (\d+)", episode_label.text.strip())
+    match match_result:
+        case re.Match(): return int(match_result.group(1))
+        case unknown: raise UnexpectedPatternException(unknown)
 
 def _content_starts_with_episode(elem: Tag) -> bool:
     """Check for elements with string content starting with 'Episode'"""
