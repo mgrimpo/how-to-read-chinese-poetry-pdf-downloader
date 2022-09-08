@@ -5,7 +5,7 @@ import re
 import aiohttp
 from dataclasses import dataclass
 from bs4 import BeautifulSoup, Tag
-import errors
+from errors import UnexpectedPatternException
 
 HTRCP_PODCAST_PAGE_URL = "https://howtoreadchinesepoetry.com/"
 
@@ -54,7 +54,7 @@ def episode_pdf_url(episode_label):
         case str(url):
             return url
         case unexpected:
-            raise errors.UnexpectedPatternException(unexpected)
+            raise UnexpectedPatternException(unexpected)
 
 
 def episode_number(episode_label):
@@ -70,7 +70,7 @@ def find_link_in_siblings(elem: Tag) -> Tag:
         case None:
             return None
         case unexpected:
-            raise errors.UnexpectedPatternException(unexpected)
+            raise UnexpectedPatternException(unexpected)
 
 
 def content_starts_with_episode(elem: Tag) -> bool:
