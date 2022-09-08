@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from functools import reduce
 import re
-from typing import cast
 import aiohttp
 from dataclasses import dataclass
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Tag, PageElement
 from errors import UnexpectedPatternException
 
 HTRCP_PODCAST_PAGE_URL = "https://howtoreadchinesepoetry.com/"
@@ -37,15 +36,8 @@ async def get_episode_links(session: aiohttp.ClientSession) -> list[EpisodeLink]
         return episode_links
 
 def _episode_title(episode_label: Tag) -> str:
-    def _tag_text_join(first_tag: Tag | str, second_tag: Tag | str) -> str:
-        match [first_tag, second_tag]:
-            case [str(first_text), str(second_text)]: return first_text + second_text
-            case [Tag(text=first_text), str(second_text)]: return first_text + second_text
-            case [str(first_text), Tag(text=second_text)]: return first_text + second_text
-            case [Tag(text=first_text), Tag(text=second_text)]: return first_text + second_text
-            case impossible : raise UnexpectedPatternException(impossible)
     siblings = filter(lambda sibling: not isinstance(sibling, Tag) or sibling.name != 'a', episode_label.next_siblings)
-    title = reduce(_tag_text_join, cast(list[Tag | str], siblings ), "")
+    title = reduce(lambda acc, element: acc + element.text, siblings, "")
     title = title.replace('[]', '')
     title = title.replace('\xa0', ' ')
     return title.strip()
