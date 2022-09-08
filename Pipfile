@@ -6,7 +6,6 @@ name = "pypi"
 [packages]
 beautifulsoup4 = "*"
 pypdf2 = "*"
-requests = "*"
 aiohttp = "~=3.8.1"
 
 [dev-packages]

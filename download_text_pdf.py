@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import dataclasses
 from numbers import Number
-import requests
 import os
 from PyPDF2 import PdfMerger, PdfReader
 import asyncio
@@ -23,13 +22,13 @@ class EpisodePdf:
 async def main():
     os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
     async with aiohttp.ClientSession() as session:
-        episode_links = get_episode_links()
+        episode_links = await get_episode_links(session)
 
         episode_pdfs_without_page_meta_data = map(
             partial(download_episode_pdf, session=session), episode_links
         )
 
-        episode_pdfs = map(read_pdf_meta_data, episode_pdfs_without_page_meta_data)
+        episode_pdfs = map(add_page_num, episode_pdfs_without_page_meta_data)
         merge_pdfs(await asyncio.gather(*episode_pdfs))
 
 
@@ -45,7 +44,7 @@ def merge_pdfs(episode_pdfs: list[EpisodePdf]):
     pdfMerger.write("merged.pdf")
 
 
-async def read_pdf_meta_data(episode_pdf: EpisodePdf) -> list[EpisodePdf]:
+async def add_page_num(episode_pdf: EpisodePdf) -> list[EpisodePdf]:
     episode_pdf = await episode_pdf
     pdfReader = PdfReader(episode_pdf.path)
     num_pages = len(pdfReader.pages)
