@@ -4,6 +4,7 @@ from numbers import Number
 import os
 from PyPDF2 import PdfMerger, PdfReader
 import asyncio
+import aiofiles
 import aiohttp
 from functools import partial
 
@@ -28,13 +29,13 @@ async def main():
             partial(download_episode_pdf, session=session), episode_links
         )
 
-        episode_pdfs = map(add_page_num, episode_pdfs_without_page_meta_data)
+        episode_pdfs = map(add_num_pages, episode_pdfs_without_page_meta_data)
         merge_pdfs(await asyncio.gather(*episode_pdfs))
 
 
 def merge_pdfs(episode_pdfs: list[EpisodePdf]):
     pdfMerger = PdfMerger()
-    current_page = 0
+    current_page = 0 # starts with 0, starting with 1 yields off by one errors
     for episode_pdf in episode_pdfs:
         pdfMerger.append(episode_pdf.path)
         pdfMerger.add_outline_item(
@@ -44,7 +45,7 @@ def merge_pdfs(episode_pdfs: list[EpisodePdf]):
     pdfMerger.write("merged.pdf")
 
 
-async def add_page_num(episode_pdf: EpisodePdf) -> list[EpisodePdf]:
+async def add_num_pages(episode_pdf: EpisodePdf) -> list[EpisodePdf]:
     episode_pdf = await episode_pdf
     pdfReader = PdfReader(episode_pdf.path)
     num_pages = len(pdfReader.pages)
@@ -62,17 +63,16 @@ async def download_episode_pdf(
     )
     if os.path.exists(episode_pdf.path):
         async with session.head(episode_link.url) as response:
-            headers = response.headers
-            response_size = headers.get("content-length", -1)
+            response_size = response.headers.get("content-length", -1)
             response_size = int(response_size)
             if response_size > 0 and response_size == os.path.getsize(episode_pdf.path):
                 _log_skip(episode_link, response_size)
                 return episode_pdf
     async with session.get(episode_link.url) as response:
         content = await response.read()
-        with open(episode_pdf.path, "wb") as f:
-            f.write(content)
-    return episode_pdf
+        async with aiofiles.open(episode_pdf.path, mode="wb") as f:
+            await f.write(content)
+        return episode_pdf
 
 
 def _log_skip(episode_link, response_size):
