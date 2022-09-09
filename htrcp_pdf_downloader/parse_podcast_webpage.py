@@ -25,17 +25,17 @@ class Topic:
 
 
 @dataclass
-class PodcastMetaData:
+class PodcastMetadata:
     topics: list[Topic]
     episodes: list[EpisodePdfLink]
 
 
-async def get_podcast_meta_data(session: aiohttp.ClientSession) -> PodcastMetaData:
+async def get_podcast_metadata(session: aiohttp.ClientSession) -> PodcastMetadata:
     async with session.get(HTRCP_PODCAST_PAGE_URL) as response:
         podcast_page_html = await response.text()
         soup = BeautifulSoup(podcast_page_html, "html.parser")
 
-        return PodcastMetaData(_find_topics(soup), _find_episode_links(soup))
+        return PodcastMetadata(_find_topics(soup), _find_episode_links(soup))
 
 
 def _find_topics(soup: BeautifulSoup):
@@ -76,7 +76,7 @@ def _topic_from_label(topic_label):
 
 
 def _topic_title(topic_label: Tag) -> str:
-    match_result = re.search("Topic\s+\d+\s+(.+)", topic_label.text.strip())
+    match_result = re.search(r"Topic\s+\d+\s+(.+)", topic_label.text.strip())
     match match_result:
         case re.Match():
             return match_result.group(1)
@@ -129,7 +129,7 @@ def _episode_pdf_url(episode_label) -> str:
 
 
 def _episode_number(episode_label) -> int:
-    match_result = re.search("Episode (\d+)", episode_label.text.strip())
+    match_result = re.search(r"Episode (\d+)", episode_label.text.strip())
     match match_result:
         case re.Match():
             return int(match_result.group(1))
