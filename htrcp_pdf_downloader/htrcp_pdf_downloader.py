@@ -36,11 +36,11 @@ async def main():
     async with aiohttp.ClientSession() as session:
         podcast_metadata = await get_podcast_metadata(session)
 
-        episode_pdfs_without_page_num = map(
+        episode_pdfs_without_num_pages = map(
             partial(download_episode_pdf, session=session), podcast_metadata.episodes
         )
 
-        episode_pdf_awaitables = map(_add_num_pages, episode_pdfs_without_page_num)
+        episode_pdf_awaitables = map(_add_num_pages, episode_pdfs_without_num_pages)
         episode_pdfs: list[EpisodePdfWithNumPages] = await asyncio.gather(  # type: ignore
             *episode_pdf_awaitables
         )
@@ -75,7 +75,7 @@ def _merge_topics_and_episodes(
 
 def merge_pdfs(topics: list[TopicWithEpisodes]):
     pdf_merger = PdfMerger()
-    current_page = 0  # starts with 0, starting with 1 yields off by one errors
+    current_page = 0  # pages start with 0, starting with 1 yields off-by-one errors
     for topic in topics:
         last_episode = topic.last_episode if topic.last_episode != -1 else " "
         title = topic.title.replace(":", " –")
@@ -130,7 +130,8 @@ async def download_episode_pdf(
 
 def _log_skip(episode_link, response_size):
     print(
-        f"Skipping download of episode {episode_link.episode_number} PDF as local file exists with same size as remote file ({response_size} bytes)"
+        f"Skipping download of episode {episode_link.episode_number} PDF as local file exists with same size as "
+        f"remote file ({response_size} bytes) "
     )
 
 
